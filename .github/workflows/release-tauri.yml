@@ -1,0 +1,99 @@
+name: Release Tauri Windows
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build Tauri app (Windows)
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          # Décoder la clé privée et la sauvegarder
+          echo "$TAURI_SIGNING_PRIVATE_KEY" > private.key.b64
+          certutil -decode private.key.b64 private.key
+          # Supprimer le fichier temporaire
+          rm private.key.b64
+          # Lancer le build
+          bun tauri build
+
+      - name: Get version from Cargo.toml
+        id: get_version
+        shell: pwsh
+        run: |
+          $version = (Select-String -Path "src-tauri/Cargo.toml" -Pattern '^version = "([^"]+)"').Matches.Groups[1].Value
+          Write-Output "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Find built exe
+        id: find_exe
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Path "src-tauri/target/release" -Filter "*.exe" -Recurse | Select-Object -First 1
+          Write-Output "exe_path=$($exe.FullName)" >> $env:GITHUB_OUTPUT
+
+      - name: Find built msi
+        id: find_msi
+        shell: pwsh
+        run: |
+          $msi = Get-ChildItem -Path "src-tauri/target/release/bundle/msi" -Filter "*.msi" -Recurse | Select-Object -First 1
+          Write-Output "msi_path=$($msi.FullName)" >> $env:GITHUB_OUTPUT
+
+      - name: Read MSI signature
+        id: read_sig
+        shell: bash
+        run: |
+          SIG=$(tail -n 1 "${{ steps.find_msi.outputs.msi_path }}.sig")
+          echo "SIG=$SIG" >> $GITHUB_ENV
+
+      - name: Generate latest.json
+        id: gen_latest
+        shell: pwsh
+        run: |
+          $MSI_NAME = Split-Path "${{ steps.find_msi.outputs.msi_path }}" -Leaf
+          $VERSION = "${{ steps.get_version.outputs.version }}"
+          $PUB_DATE = Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ"
+          $DOWNLOAD_URL = "https://github.com/${{ github.repository }}/releases/download/v$VERSION/$MSI_NAME"
+          $SIG = "${{ env.SIG }}"
+          @"
+          {
+            "version": "$VERSION",
+            "notes": "Release $VERSION",
+            "pub_date": "$PUB_DATE",
+            "platforms": {
+              "windows-x86_64": {
+                "signature": "$SIG",
+                "url": "$DOWNLOAD_URL"
+              }
+            }
+          }
+          "@ | Out-File -FilePath "latest.json" -Encoding UTF8
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.get_version.outputs.version }}
+          name: Release v${{ steps.get_version.outputs.version }}
+          files: |
+            ${{ steps.find_msi.outputs.msi_path }}
+            latest.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
