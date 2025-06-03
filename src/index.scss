@@ -1,4 +1,4 @@
-@use "sass:color";
+//@use "sass:color";
 
 html, body, #root {
     height: 100%;
@@ -6,7 +6,8 @@ html, body, #root {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    background: color.adjust(#2d1e12, $lightness: -7%);
+    background: #18191A;
+    color: #f3f3f3;
     font-family: "Montserrat", sans-serif;
     overflow: hidden;
 }

@@ -1,14 +1,84 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tauri + React + Typescript</title>
+    <style>
+      .loader-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: #18191a;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        flex-direction: column;
+      }
+      .loader {
+        width: 64px;
+        height: 64px;
+        border: 6px solid #ff9800;
+        border-top: 6px solid #232323;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      .loader-text {
+        margin-top: 20px;
+        color: #ff9800;
+        font-size: 16px;
+        letter-spacing: 2px;
+        font-family: Arial, sans-serif;
+      }
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+      .loader-hidden {
+        display: none !important;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+      body.loaded {
+        overflow: auto;
+      }
+    </style>
   </head>
 
   <body>
+    <div id="loader" class="loader-container">
+      <div class="loader"></div>
+      <div class="loader-text">Loading...</div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      window.addEventListener("load", () => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const loader = document.getElementById("loader");
+            const body = document.body;
+            loader.classList.add("loader-hidden");
+            body.classList.add("loaded");
+            setTimeout(() => {
+              if (loader && loader.parentNode) {
+                loader.parentNode.removeChild(loader);
+              }
+            }, 100);
+          });
+        });
+      });
+    </script>
   </body>
 </html>
